@@ -125,6 +125,10 @@ typedef long double type;
     return c.dist(ProjectPointSegment(a, b, c));
   }
 
+  double DistancePointLine(point a, point b, point c) {
+    return c.dist(ProjectPointLine(a, b, c));
+  }
+
   double DistancePointPlane(double x, double y, double z,
                             double a, double b, double c, double d)
   {
