@@ -1,120 +1,155 @@
-
 /**********************************************************************************
-* SUFFIX ARRAY (PATTERN FINDING, LONGEST COMMON SUBSTRING)                        *
-* Description: A suffix array is an array of all suffixes of string,              *
-*              lexicographically sorted.                                          *
-* Example: Let the given string be "abacaba".                                     *
-*                                                                                 *
-*        0 abacaba                          6 a                                   *
-*        1 bacaba     sort the suffixes     4 aba                                 *
-*        2 acaba      ---------------->     0 abacaba                             *
-*        3 caba        alphabetically       2 acaba                               *
-*        4 aba                              5 ba                                  *
-*        5 ba                               1 bacaba                              *
-*        6 a                                3 caba                                *
-*                                                                                 *
-* So the suffix array for "abacaba" is {6, 4, 0, 2, 5, 1, 3}.                     *
-* If a pattern t appears in s, it is a prefix of some suffix of s. Since the      *
-* suffix array is lexicographically sorted, we can just make a binary search for  *
-* each letter of the pattern.                                                     *
-* Time complexity: O(NlogN)                                                       *
-* Notation: sa:  suffix array vector, where sa[i] indicates a suffix beginning at *
-*                s[sa[i]]                                                         *
+* SUFFIX AUTOMATON (THE KING OF SUFFIXES!)                                        *
+* Description: A suffix automaton is a trie with all the suffixes of a word.      *
+*              Please refer to Trie section for more information about tries.     *
+* Time complexity: O(N)                                                           *
+* Notation: adj[u][v]:  means we have u -> v edge in the trie (rooted at u = 0)   *
 **********************************************************************************/
 
-// s.pb('$') (not necessary for pattern finding)
+const int N = 1e6+1, K = 26;
 
-typedef vector <int> vi;
-typedef pair <int, int> pii;
+int sl[2*N], len[2*N], sz, last;
+ll cnt[2*N];
+map <int, int> adj[2*N];
 
-vi suffix_array(string &s){
-    int n = s.size(), alph = 256;
-    vector<int> cnt(max(n, alph)), p(n), c(n);
+void add (int c) {
+    int u = sz++;
+    len[u] = len[last] + 1;
+    cnt[u] = 1;
 
-    for (auto c : s) cnt[c]++;
-    for (int i = 1; i < alph; i++) cnt[i] += cnt[i-1];
-    for (int i = 0; i < n; i++) p[--cnt[s[i]]] = i;
-    for (int i = 1; i < n; i++)
-        c[p[i]] = c[p[i-1]] + (s[p[i]] != s[p[i-1]]);
+    int p = last;
+    while (p != -1 and !adj[p][c]) {
+        adj[p][c] = u;
+        p = sl[p];
+    }
 
-    vi c2(n), p2(n);
-
-    for (int k = 0; (1 << k) < n; k++){
-        int classes = c[p[n-1]] + 1;
-        fill(cnt.begin(), cnt.begin() + classes, 0);
-
-        for (int i = 0; i < n; i++) p2[i] = (p[i] - (1 << k) + n)%n;
-        for (int i = 0; i < n; i++) cnt[c[i]]++;
-        for (int i = 1; i < classes; i++) cnt[i] += cnt[i-1];
-        for (int i = n-1; i >= 0; i--) p[--cnt[c[p2[i]]]] = p2[i];
-
-        c2[p[0]] = 0;
-        for (int i = 1; i < n; i++){
-            pii b1 = {c[p[i]], c[(p[i] + (1 << k))%n]};
-            pii b2 = {c[p[i-1]], c[(p[i-1] + (1 << k))%n]};
-            c2[p[i]] = c2[p[i-1]] + (b1 != b2);
+    if (p == -1) sl[u] = 0;
+    else {
+        int q = adj[p][c];
+        if (len[p]+1 == len[q]) sl[u] = q;
+        else {
+            int r = sz++;
+            len[r] = len[p]+1;
+            sl[r] = sl[q];
+            adj[r] = adj[q];
+            while (p != -1 and adj[p][c] == q) {
+                adj[p][c] = r;
+                p = sl[p];
+            }
+            sl[q] = sl[u] = r;
         }
-
-        c.swap(c2);
-    }
-    return p;
-}
-
-// s = text
-// sa = suffix array of text s
-// t = pattern to be found
-// match(s, sa, t) = check if t if a substring of s
-bool match (string& s, vi& sa, string& t) {
-    int l = 0, m, r = sa.size()-1;
-
-    while (l < r) {
-        m = (l+r)/2;
-
-        int res = strncmp(t.c_str(), s.c_str()+sa[m], t.size());
-        if (res == 0) return true;
-        if (res < 0) r = m-1;
-        else         l = m+1;
     }
 
-    int res = strncmp(t.c_str(), s.c_str()+sa[l], t.size());
-    return (res == 0);
+    last = u;
 }
 
-// sa = suffix_array(s);
-// Example: s = "icpc", t = "cp" => match(s, sa, t) = true
-//          s = "icpc", t = "ci" => match(s, sa, t) = false
+void clear() {
+    for(int i = 0; i <= sz; ++i) adj[i].clear();
+    last = 0;
+    sz = 1;
+    sl[0] = -1;
+}
 
-// Longest Common Prefix with SA O(n)
-vi lcp (string &s, vi &p) {
-    int n = s.size();
-    vi ans(n-1), pi(n);
-    for (int i = 0; i < n; i++) pi[p[i]] = i;
+void build (string& s) {
+    clear();
+    for (auto c : s) add(c);
+}
 
-    int lst = 0;
-    for (int i = 0; i < n-1; i++){
-        if (pi[i] == n-1) continue;
-        while (s[i+lst] == s[p[pi[i]+1] + lst]) lst++;
-
-        ans[pi[i]] = lst;
-        lst = max(0, lst-1);
+// Pattern matching - O(|p|)
+bool check (string& p) {
+    int u = 0, ok = 1;
+    for (auto c : p) {
+        u = adj[u][c];
+        if (!u) ok = 0;
     }
-
-    return ans;
+    return ok;
 }
 
-// Longest Repeated Substring - O(n)
-int lrs = 0;
-for (int i = 0; i < n; i++) lrs = max(lrs, lcp[i]);
+// Substring count - O(|p|)
+ll d[2*N];
 
-// Longest Common Substring - O(n)
-// m = s.size();
-// s = s + "$" + p + "#";
-// n = s.size();
-// vi sa = suffix_array(s)
-int lcs = 0;
-for (int i = 1; i < n; i++)
-    if ((sa[i] < m) != (sa[i-1] < m))
-        lcs = max(lcs, lcp[i]);
+void substr_cnt(int u) {
+    d[u] = 1;
+    for (auto p : adj[u]) {
+        int v = p.second;
+        if (!d[v]) substr_cnt(v);
+        d[u] += d[v];
+    }
+}
 
-// To calculate LCS for multiple texts use a sliding window with minqueue
-// The number of different substrings of a string is n*(n + 1)/2 - sum(lcs[i])
+ll substr_cnt() {
+    memset(d, 0, sizeof d);
+    substr_cnt(0);
+    return d[0] - 1;
+}
+
+// k-th Substring - O(|s|)
+// Just find the k-th path in the automaton.
+// Can be done with the value d calculated in previous problem.
+
+// Smallest cyclic shift - O(|s|)
+// Build the automaton for string s + s. And adapt previous dp
+// to only count paths with size |s|.
+
+
+// Number of occurences - O(|p|)
+vector<int> t[2*N];
+
+void occur_count (int u) {
+    for (int v : t[u]) occur_count(v), cnt[u] += cnt[v];
+}
+
+void build_tree() {
+    for (int i = 1; i <= sz; ++i)
+        t[sl[i]].push_back(i);
+    occur_count(0);
+}
+
+ll occur_count (string& p) {
+    // Call build tree once per automaton
+    int u = 0;
+    for (auto c : p) {
+        u = adj[u][c];
+        if (!u) break;
+    }
+    return !u ? 0 : cnt[u];
+}
+
+// First occurence - (|p|)
+// Store the first position of occurence fp.
+// Add the the code to add function:
+// fp[u] = len[u] - 1;
+// fp[r] = fp[q];
+
+// To answer a query, just output fp[u] - strlen(p) + 1
+// where u is the state corresponding to string p
+
+// All occurences - O(|p| + |ans|)
+// All the occurences can reach the first occurence via suffix links.
+// So every state that contains a occreunce is reacheable by the
+// first occurence state in the suffix link tree. Just do a DFS in this
+// tree, starting from the first occurence.
+// OBS: cloned nodes will output same answer twice.
+
+
+// Smallest substring not contained in the string - O(|s| * K)
+// Just do a dynamic programming:
+// d[u] = 1 // if d does not have 1 transition
+// d[u] = 1 + min d[v] // otherwise
+
+
+// LCS of 2 Strings - O(|s| + |t|)
+// Build automaton of s and traverse the automaton with string t
+// mantaining the current state and the current length.
+// When we have a transition: update state, increase length by one.
+// If we don't update state by suffix link and the new length
+// should be reduced (if bigger) to the new state length.
+// Answer will be the maximum length of the whole traversal.
+
+// LCS of n Strings - O(n*|s|*K)
+// Create a new string S = s_1 + d1 + ... + s_n + d_n,
+// where d_i are delimiters that are unique (d_i != d_j).
+// For each state use DP + bitmask to calculate if it can
+// reach a d_i transition without going through other d_j.
+// The answer will be the biggest len[u] that can reach all
+// d_i's.
