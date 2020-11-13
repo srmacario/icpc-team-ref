@@ -158,6 +158,12 @@ typedef long double type;
     return true;
   }
 
+  point lines_intersect(point p, point q, point a, point b) {
+    point r = q-p, s = b-a, c(p%q, a%b);
+    if (eq(r%s,0)) return point(INF, INF);
+    return point(point(r.x, s.x) % c, point(r.y, s.y) % c) / (r%s);
+  }
+
   point ComputeLineIntersection(point a, point b, point c, point d) {
     b=b-a; d=c-d; c=c-a;
     assert(dot(b, b) > EPS && dot(d, d) > EPS);
