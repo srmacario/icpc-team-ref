@@ -14,7 +14,7 @@
 
 string s, p, q;
 
-vi Z (string q) {
+vi Z (const string &q) {
     vi z(q.size());
     for (int i = 1, l = 0, r = 0, n = q.size(); i < n; i++) {
         if (i <= r) z[i] = min(z[i-l], r-i+1);
